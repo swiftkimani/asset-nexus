@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - TURSO_DATABASE_URL=file:/data/asset_tracker.db
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-random-secret}
+      - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@company.com}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-Admin@123}
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:

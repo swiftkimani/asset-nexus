@@ -1,0 +1,83 @@
+import { NextResponse } from "next/server"
+
+async function getOrCreateCategory(db: import("@libsql/client").Client, name: string | null) {
+  if (!name) return null
+  const existing = await db.execute({ sql: "SELECT id FROM asset_categories WHERE name = ?", args: [name.trim()] })
+  if (existing.rows[0]) return (existing.rows[0] as unknown as { id: number }).id
+  const result = await db.execute({ sql: "INSERT INTO asset_categories (name) VALUES (?) RETURNING id", args: [name.trim()] })
+  return (result.rows[0] as unknown as { id: number }).id
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const search = searchParams.get("search")
+  const category = searchParams.get("category")
+  const status = searchParams.get("status")
+  const assignedEmployee = searchParams.get("assigned_employee")
+  const skip = Number(searchParams.get("skip") || "0")
+  const limit = Math.min(Number(searchParams.get("limit") || "50"), 200)
+
+  const { getAuthUser, requireRole } = await import("@/lib/auth")
+  const { db } = await import("@/lib/db")
+  const user = await getAuthUser()
+  try { requireRole(user, "admin", "viewer") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
+
+  let sql = `SELECT a.*, ac.name as category FROM assets a LEFT JOIN asset_categories ac ON a.category_id = ac.id WHERE a.is_deleted = 0`
+  const args: any[] = []
+
+  if (search) {
+    sql += " AND (a.asset_id LIKE ? OR a.asset_unique_id LIKE ? OR a.asset_name LIKE ?)"
+    const term = `%${search}%`
+    args.push(term, term, term)
+  }
+  if (category) { sql += " AND ac.name LIKE ?"; args.push(`%${category}%`) }
+  if (status) { sql += " AND a.status = ?"; args.push(status) }
+  if (assignedEmployee) {
+    sql += " AND EXISTS (SELECT 1 FROM asset_assignments aa JOIN employees e ON e.id = aa.employee_id WHERE aa.asset_id = a.id AND aa.assignment_status = 'Assigned' AND e.name LIKE ?)"
+    args.push(`%${assignedEmployee}%`)
+  }
+
+  sql += " ORDER BY a.id DESC LIMIT ? OFFSET ?"
+  args.push(limit, skip)
+
+  const result = await db.execute({ sql, args })
+  return NextResponse.json(result.rows)
+}
+
+export async function POST(request: Request) {
+  const { getAuthUser, requireRole } = await import("@/lib/auth")
+  const { db } = await import("@/lib/db")
+  const user = await getAuthUser()
+  try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
+
+  try {
+    const body = await request.json()
+    const existing = await db.execute({
+      sql: "SELECT id FROM assets WHERE asset_unique_id = ?", args: [body.asset_unique_id],
+    })
+    if (existing.rows.length > 0) return NextResponse.json({ detail: "Asset unique ID already exists" }, { status: 400 })
+
+    const countResult = await db.execute("SELECT COUNT(*) as count FROM assets")
+    const count = (countResult.rows[0] as unknown as { count: number }).count
+    const assetId = `AST-${String(count + 1).padStart(5, "0")}`
+
+    const categoryId = await getOrCreateCategory(db, body.category)
+
+    const result = await db.execute({
+      sql: `INSERT INTO assets (asset_id, asset_unique_id, asset_name, category_id, brand, model, serial_number, purchase_date, purchase_cost, vendor, warranty_expiry, asset_location, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      args: [
+        assetId, body.asset_unique_id, body.asset_name, categoryId, body.brand || null, body.model || null,
+        body.serial_number || null, body.purchase_date || null, body.purchase_cost || null, body.vendor || null,
+        body.warranty_expiry || null, body.asset_location || null, body.status || "Available",
+      ],
+    })
+
+    const asset = result.rows[0] as Record<string, unknown>
+    const catResult = await db.execute({ sql: "SELECT name FROM asset_categories WHERE id = ?", args: [categoryId] })
+    asset.category = catResult.rows[0] ? (catResult.rows[0] as unknown as { name: string }).name : null
+    return NextResponse.json(asset, { status: 201 })
+  } catch {
+    return NextResponse.json({ detail: "Failed to create asset" }, { status: 500 })
+  }
+}
