@@ -1,0 +1,15 @@
+http:
+  routers:
+    asset-ops:
+      rule: "Host(`asset.benardkimani.co.ke`) || Host(`assets.benardkimani.co.ke`)"
+      service: asset-ops
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    asset-ops:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3000"
