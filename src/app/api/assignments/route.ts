@@ -13,27 +13,34 @@ export async function GET(request: Request) {
   const user = await getAuthUser()
   try { requireRole(user, "admin", "viewer") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
-  let sql = `SELECT aa.*, a.asset_name, a.asset_unique_id, e.name as employee_name, e.employee_id as employee_code
-             FROM asset_assignments aa
-             LEFT JOIN assets a ON aa.asset_id = a.id
-             LEFT JOIN employees e ON aa.employee_id = e.id
-             WHERE 1=1`
+  const baseSql = `FROM asset_assignments aa
+                   LEFT JOIN assets a ON aa.asset_id = a.id
+                   LEFT JOIN employees e ON aa.employee_id = e.id
+                   WHERE 1=1`
+  let whereSql = ""
   const args: any[] = []
 
-  if (status) { sql += " AND aa.assignment_status = ?"; args.push(status) }
-  if (employeeId) { sql += " AND aa.employee_id = ?"; args.push(Number(employeeId)) }
-  if (assetId) { sql += " AND aa.asset_id = ?"; args.push(Number(assetId)) }
+  if (status) { whereSql += " AND aa.assignment_status = ?"; args.push(status) }
+  if (employeeId) { whereSql += " AND aa.employee_id = ?"; args.push(Number(employeeId)) }
+  if (assetId) { whereSql += " AND aa.asset_id = ?"; args.push(Number(assetId)) }
 
-  sql += " ORDER BY aa.id DESC LIMIT ? OFFSET ?"
-  args.push(limit, skip)
+  const countResult = await db.execute({
+    sql: `SELECT COUNT(*) as count ${baseSql} ${whereSql}`,
+    args: [...args],
+  })
+  const total = (countResult.rows[0] as unknown as { count: number }).count
 
-  const result = await db.execute({ sql, args })
-  return NextResponse.json(result.rows)
+  const result = await db.execute({
+    sql: `SELECT aa.*, a.asset_name, a.asset_unique_id, e.name as employee_name, e.employee_id as employee_code ${baseSql} ${whereSql} ORDER BY aa.id DESC LIMIT ? OFFSET ?`,
+    args: [...args, limit, skip],
+  })
+  return NextResponse.json({ data: result.rows, total })
 }
 
 export async function POST(request: Request) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -73,6 +80,7 @@ export async function POST(request: Request) {
             WHERE aa.assignment_id = ?`,
       args: [asnId],
     })
+    await log(user?.email, "create", "assignment", asnId, `Assigned asset ${asset_id} to employee ${employee_id}`)
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch {
     return NextResponse.json({ detail: "Failed to create assignment" }, { status: 500 })

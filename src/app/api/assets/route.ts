@@ -22,31 +22,39 @@ export async function GET(request: Request) {
   const user = await getAuthUser()
   try { requireRole(user, "admin", "viewer") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
-  let sql = `SELECT a.*, ac.name as category FROM assets a LEFT JOIN asset_categories ac ON a.category_id = ac.id WHERE a.is_deleted = 0`
+  const baseSql = `FROM assets a LEFT JOIN asset_categories ac ON a.category_id = ac.id WHERE a.is_deleted = 0`
+  let whereSql = ``
   const args: any[] = []
 
   if (search) {
-    sql += " AND (a.asset_id LIKE ? OR a.asset_unique_id LIKE ? OR a.asset_name LIKE ?)"
+    whereSql += " AND (a.asset_id LIKE ? OR a.asset_unique_id LIKE ? OR a.asset_name LIKE ?)"
     const term = `%${search}%`
     args.push(term, term, term)
   }
-  if (category) { sql += " AND ac.name LIKE ?"; args.push(`%${category}%`) }
-  if (status) { sql += " AND a.status = ?"; args.push(status) }
+  if (category) { whereSql += " AND ac.name LIKE ?"; args.push(`%${category}%`) }
+  if (status) { whereSql += " AND a.status = ?"; args.push(status) }
   if (assignedEmployee) {
-    sql += " AND EXISTS (SELECT 1 FROM asset_assignments aa JOIN employees e ON e.id = aa.employee_id WHERE aa.asset_id = a.id AND aa.assignment_status = 'Assigned' AND e.name LIKE ?)"
+    whereSql += " AND EXISTS (SELECT 1 FROM asset_assignments aa JOIN employees e ON e.id = aa.employee_id WHERE aa.asset_id = a.id AND aa.assignment_status = 'Assigned' AND e.name LIKE ?)"
     args.push(`%${assignedEmployee}%`)
   }
 
-  sql += " ORDER BY a.id DESC LIMIT ? OFFSET ?"
-  args.push(limit, skip)
+  const countResult = await db.execute({
+    sql: `SELECT COUNT(*) as count ${baseSql} ${whereSql}`,
+    args: [...args],
+  })
+  const total = (countResult.rows[0] as unknown as { count: number }).count
 
-  const result = await db.execute({ sql, args })
-  return NextResponse.json(result.rows)
+  const result = await db.execute({
+    sql: `SELECT a.*, ac.name as category ${baseSql} ${whereSql} ORDER BY a.id DESC LIMIT ? OFFSET ?`,
+    args: [...args, limit, skip],
+  })
+  return NextResponse.json({ data: result.rows, total })
 }
 
 export async function POST(request: Request) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -57,9 +65,8 @@ export async function POST(request: Request) {
     })
     if (existing.rows.length > 0) return NextResponse.json({ detail: "Asset unique ID already exists" }, { status: 400 })
 
-    const countResult = await db.execute("SELECT COUNT(*) as count FROM assets")
-    const count = (countResult.rows[0] as unknown as { count: number }).count
-    const assetId = `AST-${String(count + 1).padStart(5, "0")}`
+    const { generateDisplayId } = await import("@/lib/id-gen")
+    const assetId = await generateDisplayId("AST", 5, "assets", "asset_id")
 
     const categoryId = await getOrCreateCategory(db, body.category)
 
@@ -76,6 +83,7 @@ export async function POST(request: Request) {
     const asset = result.rows[0] as Record<string, unknown>
     const catResult = await db.execute({ sql: "SELECT name FROM asset_categories WHERE id = ?", args: [categoryId] })
     asset.category = catResult.rows[0] ? (catResult.rows[0] as unknown as { name: string }).name : null
+    await log(user?.email, "create", "asset", asset.asset_id as string, `Created asset ${asset.asset_name}`)
     return NextResponse.json(asset, { status: 201 })
   } catch {
     return NextResponse.json({ detail: "Failed to create asset" }, { status: 500 })

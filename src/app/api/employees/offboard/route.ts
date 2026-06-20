@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       args: [emp.id],
     })
 
+    await log(user?.email, "offboard", "employee", emp.employee_id, `Offboarded employee, returned ${activeAsns.rows.length} assets`)
     return NextResponse.json({
       message: "Employee offboarded successfully",
       employee_id: emp.id,

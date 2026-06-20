@@ -7,3 +7,5 @@ export const db = createClient({
   url,
   authToken,
 })
+
+db.execute("PRAGMA foreign_keys = ON").catch(() => {})

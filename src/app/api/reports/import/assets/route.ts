@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
       }
     }
 
+    await log(user?.email, "import", "asset", null, `Imported ${created} created, ${updated} updated assets`)
     return NextResponse.json({ message: "Assets imported", created, updated })
   } catch {
     return NextResponse.json({ detail: "Import failed" }, { status: 500 })

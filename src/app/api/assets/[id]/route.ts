@@ -11,6 +11,7 @@ async function getOrCreateCategory(db: import("@libsql/client").Client, name: st
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -38,12 +39,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     sql: "SELECT a.*, ac.name as category FROM assets a LEFT JOIN asset_categories ac ON a.category_id = ac.id WHERE a.id = ?",
     args: [Number(id)],
   })
+  await log(user?.email, "update", "asset", id, "Updated asset details")
   return NextResponse.json(result.rows[0])
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -55,5 +58,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     sql: "UPDATE assets SET status = 'Inactive', is_deleted = 1, updated_at = datetime('now') WHERE id = ?",
     args: [Number(id)],
   })
+  await log(user?.email, "deactivate", "asset", id, `Deactivated asset id ${id}`)
   return NextResponse.json({ message: "Asset deactivated" })
 }

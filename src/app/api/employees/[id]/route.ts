@@ -21,6 +21,7 @@ export async function PUT(
 ) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -39,6 +40,7 @@ export async function PUT(
 
   await db.execute({ sql: `UPDATE employees SET ${setClause}, updated_at = datetime('now') WHERE id = ?`, args: values })
   const result = await db.execute({ sql: "SELECT * FROM employees WHERE id = ?", args: [Number(id)] })
+  await log(user?.email, "update", "employee", id, "Updated employee details")
   return NextResponse.json(result.rows[0])
 }
 
@@ -48,6 +50,7 @@ export async function DELETE(
 ) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -76,5 +79,6 @@ export async function DELETE(
     args: [Number(id)],
   })
 
+  await log(user?.email, "deactivate", "employee", id, `Deactivated employee id ${id}`)
   return NextResponse.json({ message: "Employee deactivated", returned_assets: activeAsns.rows.length })
 }

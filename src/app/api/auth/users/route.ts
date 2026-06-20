@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { hashPassword, getAuthUser, requireRole } from "@/lib/auth"
+import { log } from "@/lib/audit"
+
+export async function GET() {
+  const user = await getAuthUser()
+  try { requireRole(user, "admin") } catch {
+    return NextResponse.json({ detail: "Forbidden" }, { status: 403 })
+  }
+
+  const result = await db.execute("SELECT id, name, email, role, created_at FROM users ORDER BY id ASC")
+  return NextResponse.json(result.rows)
+}
 
 export async function POST(request: Request) {
   const user = await getAuthUser()
@@ -25,6 +36,7 @@ export async function POST(request: Request) {
       sql: "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) RETURNING id, name, email, role, created_at",
       args: [name, email, await hashPassword(password), role],
     })
+    await log(user?.email, "create", "user", String((result.rows[0] as Record<string, unknown>).id), `Created user ${email} with role ${role}`)
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch {
     return NextResponse.json({ detail: "Failed to create user" }, { status: 500 })

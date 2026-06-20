@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getAuthUser, requireRole } = await import("@/lib/auth")
   const { db } = await import("@/lib/db")
+  const { log } = await import("@/lib/audit")
   const user = await getAuthUser()
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
@@ -39,6 +40,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             WHERE aa.id = ?`,
       args: [Number(id)],
     })
+    await log(user?.email, "return", "assignment", id, `Returned asset assignment id ${id}`)
     return NextResponse.json(result.rows[0])
   } catch {
     return NextResponse.json({ detail: "Failed to return asset" }, { status: 500 })

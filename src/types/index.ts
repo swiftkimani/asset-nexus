@@ -114,3 +114,11 @@ export interface RecentAssignment {
   assigned_date: string
   status: string
 }
+
+export interface UserOut {
+  id: number
+  name: string
+  email: string
+  role: string
+  created_at: string
+}

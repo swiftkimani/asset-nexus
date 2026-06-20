@@ -30,7 +30,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Asset Tracker</CardTitle>
+          <div className="flex justify-center mb-3">
+            <img src="/favicon.svg" alt="Asset Nexus" className="h-12 w-12" />
+          </div>
+          <CardTitle className="text-2xl">Asset Nexus</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>

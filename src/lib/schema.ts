@@ -1,6 +1,8 @@
 import { db } from "./db"
 
 export async function initSchema() {
+  await db.execute("PRAGMA foreign_keys = ON")
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

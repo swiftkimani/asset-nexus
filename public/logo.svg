@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="none">
+  <defs>
+    <linearGradient id="nexusGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon mark: Nexus symbol -->
+  <g transform="translate(8, 10)">
+    <!-- Outer hexagon -->
+    <polygon points="40,0 74.6,20 74.6,60 40,80 5.4,60 5.4,20" fill="url(#nexusGrad)" opacity="0.08"/>
+    <polygon points="40,4 70.6,21.3 70.6,58.7 40,76 9.4,58.7 9.4,21.3" fill="none" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.3"/>
+
+    <!-- Center hexagon -->
+    <polygon points="40,16 60.8,28 60.8,52 40,64 19.2,52 19.2,28" fill="url(#nexusGrad)" opacity="0.12"/>
+    <polygon points="40,20 56.8,29.3 56.8,50.7 40,60 23.2,50.7 23.2,29.3" fill="none" stroke="url(#nexusGrad)" stroke-width="1.5"/>
+
+    <!-- Inner diamond (nexus core) -->
+    <polygon points="40,28 50,40 40,52 30,40" fill="url(#nexusGrad)"/>
+
+    <!-- Connection lines from center to outer points -->
+    <line x1="40" y1="16" x2="40" y2="28" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="60.8" y1="28" x2="56.8" y2="29.3" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="60.8" y1="52" x2="56.8" y2="50.7" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="40" y1="64" x2="40" y2="60" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="19.2" y1="52" x2="23.2" y2="50.7" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="19.2" y1="28" x2="23.2" y2="29.3" stroke="url(#nexusGrad)" stroke-width="1.5" opacity="0.5"/>
+
+    <!-- Orbital nodes -->
+    <circle cx="40" cy="8" r="3" fill="#6366f1" opacity="0.7"/>
+    <circle cx="68" cy="24" r="3" fill="#6366f1" opacity="0.7"/>
+    <circle cx="68" cy="56" r="3" fill="#06b6d4" opacity="0.7"/>
+    <circle cx="40" cy="72" r="3" fill="#06b6d4" opacity="0.7"/>
+    <circle cx="12" cy="56" r="3" fill="#06b6d4" opacity="0.7"/>
+    <circle cx="12" cy="24" r="3" fill="#6366f1" opacity="0.7"/>
+  </g>
+
+  <!-- Text -->
+  <text x="105" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" fill="url(#textGrad)" letter-spacing="-0.5">Asset</text>
+  <text x="105" y="90" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="300" fill="#64748b" letter-spacing="1">Nexus</text>
+
+  <!-- Tagline -->
+  <text x="105" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#94a3b8" letter-spacing="2">ASSET LIFECYCLE MANAGEMENT</text>
+</svg>
