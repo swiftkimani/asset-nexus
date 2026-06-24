@@ -22,39 +22,48 @@ export async function POST(request: Request) {
     const deleteOrder = ["asset_assignments", "assets", "asset_categories", "employees", "audit_logs", "users"]
     const restored: Record<string, number> = {}
 
-    if (mode === "replace") {
-      for (const table of deleteOrder) {
-        await db.execute(`DELETE FROM ${table}`)
-      }
-    }
+    await db.execute("BEGIN TRANSACTION")
 
-    for (const table of tables) {
-      const rows = payload.tables?.[table] || []
-      let count = 0
-      for (const row of rows) {
-        const cols = Object.keys(row)
-        const placeholders = cols.map(() => "?").join(", ")
-        const values = cols.map((c) => row[c])
-
-        if (mode === "merge" && row.id) {
-          const existing = await db.execute({ sql: `SELECT id FROM ${table} WHERE id = ?`, args: [row.id] })
-          if (existing.rows.length > 0) {
-            const setClause = cols.filter((c) => c !== "id").map((c) => `${c} = ?`).join(", ")
-            const updateValues = cols.filter((c) => c !== "id").map((c) => row[c])
-            updateValues.push(row.id)
-            await db.execute({ sql: `UPDATE ${table} SET ${setClause} WHERE id = ?`, args: updateValues })
-            count++
-            continue
-          }
+    try {
+      if (mode === "replace") {
+        for (const table of deleteOrder) {
+          await db.execute(`DELETE FROM ${table}`)
         }
-
-        await db.execute({ sql: `INSERT INTO ${table} (${cols.join(", ")}) VALUES (${placeholders})`, args: values })
-        count++
       }
-      restored[table] = count
+
+      for (const table of tables) {
+        const rows = payload.tables?.[table] || []
+        let count = 0
+        for (const row of rows) {
+          const cols = Object.keys(row)
+          const placeholders = cols.map(() => "?").join(", ")
+          const values = cols.map((c) => row[c])
+
+          if (mode === "merge" && row.id) {
+            const existing = await db.execute({ sql: `SELECT id FROM ${table} WHERE id = ?`, args: [row.id] })
+            if (existing.rows.length > 0) {
+              const setClause = cols.filter((c) => c !== "id").map((c) => `${c} = ?`).join(", ")
+              const updateValues = cols.filter((c) => c !== "id").map((c) => row[c])
+              updateValues.push(row.id)
+              await db.execute({ sql: `UPDATE ${table} SET ${setClause} WHERE id = ?`, args: updateValues })
+              count++
+              continue
+            }
+          }
+
+          await db.execute({ sql: `INSERT INTO ${table} (${cols.join(", ")}) VALUES (${placeholders})`, args: values })
+          count++
+        }
+        restored[table] = count
+      }
+
+      await db.execute("COMMIT")
+    } catch (e) {
+      await db.execute("ROLLBACK")
+      return NextResponse.json({ detail: `Restore failed, rolled back: ${(e as Error).message}` }, { status: 500 })
     }
 
-    return NextResponse.json({ message: "Backup restored", mode, restored_counts: restored })
+    return NextResponse.json({ message: "Backup restored (transactional)", mode, restored_counts: restored })
   } catch (e) {
     return NextResponse.json({ detail: `Restore failed: ${(e as Error).message}` }, { status: 500 })
   }

@@ -2,9 +2,12 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { db } from "@/lib/db"
 import { verifyPassword, createToken } from "@/lib/auth"
+import { ensureInitialized } from "@/lib/init"
 
 export async function POST(request: Request) {
   try {
+    await ensureInitialized()
+
     const { email, password } = await request.json()
     if (!email || !password) {
       return NextResponse.json({ detail: "Email and password required" }, { status: 400 })
@@ -16,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ detail: "Invalid email or password" }, { status: 401 })
     }
 
-    const token = createToken({
+    const token = await createToken({
       email: user.email as string,
       role: user.role as string,
       name: user.name as string,

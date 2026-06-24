@@ -46,33 +46,51 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { asset_id, employee_id, assigned_date, notes } = body
+    const { asset_id, employee_id, assigned_date, expected_return_date, notes } = body
 
-    const asset = await db.execute({
-      sql: "SELECT id, status FROM assets WHERE id = ? AND is_deleted = 0", args: [asset_id],
-    })
-    if (!asset.rows[0]) return NextResponse.json({ detail: "Asset not found" }, { status: 404 })
-    if ((asset.rows[0] as unknown as { status: string }).status !== "Available") {
-      return NextResponse.json({ detail: "Only available assets can be assigned" }, { status: 400 })
-    }
+    const { validateBodySize } = await import("@/lib/utils")
+    const sizeErr = validateBodySize(request)
+    if (sizeErr) return NextResponse.json({ detail: sizeErr }, { status: 413 })
+
+    const { generateDisplayId } = await import("@/lib/id-gen")
 
     const employee = await db.execute({
-      sql: "SELECT id, employment_status FROM employees WHERE id = ? AND is_deleted = 0", args: [employee_id],
+      sql: "SELECT id, employment_status, office_location FROM employees WHERE id = ? AND is_deleted = 0", args: [employee_id],
     })
     if (!employee.rows[0]) return NextResponse.json({ detail: "Employee not found" }, { status: 404 })
-    if ((employee.rows[0] as unknown as { employment_status: string }).employment_status !== "Active") {
+    const emp = employee.rows[0] as unknown as { id: number; employment_status: string; office_location: string | null }
+    if (emp.employment_status !== "Active") {
       return NextResponse.json({ detail: "Asset cannot be assigned to inactive employee" }, { status: 400 })
     }
 
-    const asnCount = await db.execute("SELECT COUNT(*) as count FROM asset_assignments")
-    const num = (asnCount.rows[0] as unknown as { count: number }).count
-    const asnId = `ASN-${String(num + 1).padStart(5, "0")}`
+    if (assigned_date) {
+      const today = new Date().toISOString().split("T")[0]
+      if (assigned_date > today) return NextResponse.json({ detail: "Assigned date cannot be in the future" }, { status: 400 })
+    }
+
+    const asnId = await generateDisplayId("ASN", 5, "asset_assignments", "assignment_id")
+
+    const updateResult = await db.execute({
+      sql: "UPDATE assets SET status = 'Assigned' WHERE id = ? AND status = 'Available' AND is_deleted = 0",
+      args: [asset_id],
+    })
+    if (updateResult.rowsAffected === 0) {
+      const asset = await db.execute({ sql: "SELECT id, status FROM assets WHERE id = ? AND is_deleted = 0", args: [asset_id] })
+      if (!asset.rows[0]) return NextResponse.json({ detail: "Asset not found" }, { status: 404 })
+      return NextResponse.json({ detail: "Only available assets can be assigned (race-safe)" }, { status: 400 })
+    }
+
+    if (emp.office_location) {
+      await db.execute({
+        sql: "UPDATE assets SET asset_location = ? WHERE id = ?",
+        args: [emp.office_location, asset_id],
+      })
+    }
 
     await db.execute({
-      sql: "INSERT INTO asset_assignments (assignment_id, asset_id, employee_id, assigned_date, assignment_status, notes) VALUES (?, ?, ?, ?, 'Assigned', ?)",
-      args: [asnId, asset_id, employee_id, assigned_date, notes || null],
+      sql: "INSERT INTO asset_assignments (assignment_id, asset_id, employee_id, assigned_date, expected_return_date, assignment_status, notes) VALUES (?, ?, ?, ?, ?, 'Assigned', ?)",
+      args: [asnId, asset_id, employee_id, assigned_date, expected_return_date || null, notes || null],
     })
-    await db.execute({ sql: "UPDATE assets SET status = 'Assigned' WHERE id = ?", args: [asset_id] })
 
     const result = await db.execute({
       sql: `SELECT aa.*, a.asset_name, a.asset_unique_id, e.name as employee_name, e.employee_id as employee_code

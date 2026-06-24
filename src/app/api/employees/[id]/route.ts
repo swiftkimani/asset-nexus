@@ -30,6 +30,13 @@ export async function PUT(
   if (!employee.rows[0]) return NextResponse.json({ detail: "Employee not found" }, { status: 404 })
 
   const body = await request.json()
+  if (body.email !== undefined) {
+    const { validateEmail } = await import("@/lib/utils")
+    const emailErr = validateEmail(body.email)
+    if (emailErr) return NextResponse.json({ detail: emailErr }, { status: 400 })
+    body.email = body.email.toLowerCase().trim()
+  }
+
   const fields = ["name", "email", "phone", "designation", "department", "reporting_person", "office_location", "joining_date", "employment_status", "notes"]
   const updates = fields.filter((f) => body[f] !== undefined)
   if (updates.length === 0) return NextResponse.json({ detail: "No fields to update" }, { status: 400 })

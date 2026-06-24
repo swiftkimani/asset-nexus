@@ -16,11 +16,35 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
   const { id } = await params
-  const asset = await db.execute({ sql: "SELECT id FROM assets WHERE id = ? AND is_deleted = 0", args: [Number(id)] })
+  const asset = await db.execute({ sql: "SELECT id, status FROM assets WHERE id = ? AND is_deleted = 0", args: [Number(id)] })
   if (!asset.rows[0]) return NextResponse.json({ detail: "Asset not found" }, { status: 404 })
+  const currentStatus = (asset.rows[0] as unknown as { status: string }).status
 
   const body = await request.json()
-  const fields = ["asset_unique_id", "asset_name", "brand", "model", "serial_number", "purchase_date", "purchase_cost", "vendor", "warranty_expiry", "asset_location", "status"]
+  const { validateBodySize } = await import("@/lib/utils")
+  const sizeErr = validateBodySize(request)
+  if (sizeErr) return NextResponse.json({ detail: sizeErr }, { status: 413 })
+
+  if (body.serial_number) {
+    const dup = await db.execute({ sql: "SELECT id FROM assets WHERE serial_number = ? AND id != ? AND is_deleted = 0", args: [body.serial_number, Number(id)] })
+    if (dup.rows.length > 0) return NextResponse.json({ detail: "Serial number already exists" }, { status: 400 })
+  }
+
+  if (body.status !== undefined && body.status !== currentStatus) {
+    const allowed: Record<string, string[]> = {
+      Available: ["Under Repair", "Inactive"],
+      Assigned: ["Under Repair", "Inactive", "Lost"],
+      "Under Repair": ["Available", "Inactive"],
+      Inactive: [],
+      Lost: [],
+      Disposed: [],
+    }
+    if (!(allowed[currentStatus] ?? []).includes(body.status)) {
+      return NextResponse.json({ detail: `Cannot change status from '${currentStatus}' to '${body.status}'` }, { status: 400 })
+    }
+  }
+
+  const fields = ["asset_unique_id", "asset_name", "brand", "model", "serial_number", "purchase_date", "purchase_cost", "vendor", "warranty_expiry", "asset_location", "status", "condition", "depreciation_method", "useful_life_years", "salvage_value"]
 
   if (body.category !== undefined) {
     const catId = await getOrCreateCategory(db, body.category)
@@ -51,13 +75,24 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   try { requireRole(user, "admin") } catch { return NextResponse.json({ detail: "Forbidden" }, { status: 403 }) }
 
   const { id } = await params
-  const asset = await db.execute({ sql: "SELECT id FROM assets WHERE id = ? AND is_deleted = 0", args: [Number(id)] })
+  const asset = await db.execute({ sql: "SELECT id, status FROM assets WHERE id = ? AND is_deleted = 0", args: [Number(id)] })
   if (!asset.rows[0]) return NextResponse.json({ detail: "Asset not found" }, { status: 404 })
+
+  const activeAsns = await db.execute({
+    sql: "SELECT id FROM asset_assignments WHERE asset_id = ? AND assignment_status = 'Assigned'",
+    args: [Number(id)],
+  })
+  for (const asn of activeAsns.rows as unknown as Array<{ id: number }>) {
+    await db.execute({
+      sql: "UPDATE asset_assignments SET assignment_status = 'Returned', returned_date = datetime('now') WHERE id = ?",
+      args: [asn.id],
+    })
+  }
 
   await db.execute({
     sql: "UPDATE assets SET status = 'Inactive', is_deleted = 1, updated_at = datetime('now') WHERE id = ?",
     args: [Number(id)],
   })
-  await log(user?.email, "deactivate", "asset", id, `Deactivated asset id ${id}`)
-  return NextResponse.json({ message: "Asset deactivated" })
+  await log(user?.email, "deactivate", "asset", id, `Deactivated asset id ${id} — auto-returned ${activeAsns.rows.length} assignments`)
+  return NextResponse.json({ message: "Asset deactivated", returned_assignments: activeAsns.rows.length })
 }

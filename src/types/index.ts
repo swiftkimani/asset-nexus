@@ -47,6 +47,11 @@ export interface Asset {
   warranty_expiry: string | null
   asset_location: string | null
   status: string
+  condition: string
+  accumulated_maintenance_cost: number | null
+  depreciation_method: string | null
+  useful_life_years: number | null
+  salvage_value: number | null
   is_deleted: number
   created_at: string
   updated_at: string
@@ -94,6 +99,11 @@ export interface AssetOut {
   warranty_expiry: string | null
   asset_location: string | null
   status: string
+  condition: string
+  accumulated_maintenance_cost: number | null
+  depreciation_method: string | null
+  useful_life_years: number | null
+  salvage_value: number | null
   created_at: string
   updated_at: string
 }
@@ -104,6 +114,10 @@ export interface DashboardStats {
   assigned_assets: number
   available_assets: number
   under_repair_assets: number
+  assets_by_category: { name: string; count: number }[]
+  assets_by_status: { status: string; count: number }[]
+  assignments_by_month: { month: string; count: number }[]
+  department_assets: { department: string; count: number }[]
 }
 
 export interface RecentAssignment {
@@ -120,5 +134,142 @@ export interface UserOut {
   name: string
   email: string
   role: string
+  created_at: string
+}
+
+export interface DisposalLog {
+  id: number
+  asset_id: number
+  disposal_date: string
+  disposal_method: string
+  authorized_by: string | null
+  reason: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface WarrantyClaim {
+  id: number
+  asset_id: number
+  claim_number: string | null
+  rma_number: string | null
+  vendor_contact: string | null
+  claim_date: string
+  issue_description: string | null
+  status: string
+  resolution: string | null
+  resolved_date: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface ServiceLog {
+  id: number
+  asset_id: number
+  reported_date: string
+  issue_description: string
+  vendor: string | null
+  cost: number | null
+  resolution: string | null
+  resolved_date: string | null
+  downtime_days: number | null
+  service_notes: string | null
+  created_at: string
+}
+
+export interface MaintenanceSchedule {
+  id: number
+  asset_id: number
+  schedule_name: string
+  frequency_days: number
+  last_done_date: string | null
+  next_due_date: string
+  assigned_to: string | null
+  notes: string | null
+  is_active: number
+  created_at: string
+}
+
+export interface PurchaseOrder {
+  id: number
+  po_number: string
+  vendor: string
+  order_date: string
+  total_amount: number | null
+  status: string
+  approved_by: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface Vendor {
+  id: number
+  name: string
+  contact_person: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+  rating: number | null
+  notes: string | null
+  is_active: number
+  created_at: string
+}
+
+export interface AssetRequest {
+  id: number
+  requester_name: string
+  requester_email: string
+  asset_name: string
+  category: string | null
+  justification: string | null
+  status: string
+  reviewed_by: string | null
+  review_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Notification {
+  id: number
+  user_id: number | null
+  title: string
+  message: string
+  type: string
+  link: string | null
+  is_read: number
+  created_at: string
+}
+
+export interface ApiToken {
+  id: number
+  user_id: number
+  name: string
+  token_hash: string
+  last_used_at: string | null
+  expires_at: string | null
+  is_active: number
+  created_at: string
+}
+
+export interface ReportSchedule {
+  id: number
+  name: string
+  report_type: string
+  frequency: string
+  recipients: string
+  format: string
+  last_sent_at: string | null
+  next_run_at: string
+  is_active: number
+  created_by: string | null
+  created_at: string
+}
+
+export interface SavedFilter {
+  id: number
+  user_email: string
+  entity: string
+  name: string
+  filters: string
   created_at: string
 }

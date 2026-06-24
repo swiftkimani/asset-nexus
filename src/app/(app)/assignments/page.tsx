@@ -125,8 +125,8 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Assignments</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-2xl lg:text-3xl font-bold">Assignments</h1>
         {isAdmin && (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" /> Assign Asset</Button></DialogTrigger>
@@ -164,7 +164,7 @@ export default function AssignmentsPage() {
 
       <div className="flex gap-2">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="Assigned">Assigned</SelectItem>
@@ -175,6 +175,7 @@ export default function AssignmentsPage() {
 
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
@@ -219,6 +220,7 @@ export default function AssignmentsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 

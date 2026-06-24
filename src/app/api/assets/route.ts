@@ -38,6 +38,14 @@ export async function GET(request: Request) {
     args.push(`%${assignedEmployee}%`)
   }
 
+  const userRecord = await db.execute({ sql: "SELECT department, role FROM users WHERE email = ?", args: [user!.email] })
+  const userDept = (userRecord.rows[0] as any)?.department
+  const isAdmin = (userRecord.rows[0] as any)?.role === "admin"
+  if (userDept && !isAdmin) {
+    whereSql += " AND (a.asset_location = ? OR EXISTS (SELECT 1 FROM asset_assignments aa2 JOIN employees e2 ON e2.id = aa2.employee_id WHERE aa2.asset_id = a.id AND e2.department = ?))"
+    args.push(userDept, userDept)
+  }
+
   const countResult = await db.execute({
     sql: `SELECT COUNT(*) as count ${baseSql} ${whereSql}`,
     args: [...args],
@@ -60,10 +68,19 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
+    const { validateBodySize } = await import("@/lib/utils")
+    const sizeErr = validateBodySize(request)
+    if (sizeErr) return NextResponse.json({ detail: sizeErr }, { status: 413 })
+
     const existing = await db.execute({
       sql: "SELECT id FROM assets WHERE asset_unique_id = ?", args: [body.asset_unique_id],
     })
     if (existing.rows.length > 0) return NextResponse.json({ detail: "Asset unique ID already exists" }, { status: 400 })
+
+    if (body.serial_number) {
+      const dup = await db.execute({ sql: "SELECT id FROM assets WHERE serial_number = ? AND is_deleted = 0", args: [body.serial_number] })
+      if (dup.rows.length > 0) return NextResponse.json({ detail: "Serial number must be unique" }, { status: 400 })
+    }
 
     const { generateDisplayId } = await import("@/lib/id-gen")
     const assetId = await generateDisplayId("AST", 5, "assets", "asset_id")

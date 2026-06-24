@@ -20,6 +20,38 @@ export function formatCurrency(amount: number | string | null | undefined): stri
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num)
 }
 
+export function straightLineDepreciation(cost: number | null | undefined, salvage: number | null | undefined, lifeYears: number | null | undefined, purchaseDate: string | null | undefined): number {
+  if (!cost || !purchaseDate || !lifeYears) return cost ?? 0
+  const sv = salvage ?? 0
+  const yearsOwned = (Date.now() - new Date(purchaseDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+  const annualDepreciation = (cost - sv) / lifeYears
+  const accumulated = Math.min(annualDepreciation * yearsOwned, cost - sv)
+  return Math.max(cost - accumulated, sv)
+}
+
+export function validatePassword(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters"
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter"
+  if (!/[a-z]/.test(password)) return "Password must contain at least one lowercase letter"
+  if (!/[0-9]/.test(password)) return "Password must contain at least one digit"
+  return null
+}
+
+export function validateEmail(email: string): string | null {
+  if (!email || typeof email !== "string") return "Email is required"
+  if (email.length > 254) return "Email is too long"
+  if (/\s/.test(email)) return "Email must not contain spaces"
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!re.test(email)) return "Invalid email format"
+  return null
+}
+
+export function validateBodySize(request: Request, maxBytes = 1_048_576): string | null {
+  const len = request.headers.get("content-length")
+  if (len && Number(len) > maxBytes) return `Request body exceeds ${Math.round(maxBytes / 1024)}KB limit`
+  return null
+}
+
 export function statusColor(status: string): string {
   const s = status.toLowerCase()
   if (["active", "available", "assigned"].includes(s)) return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"

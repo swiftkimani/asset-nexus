@@ -27,23 +27,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const employee = await db.execute({
-      sql: "SELECT id, name, employment_status FROM employees WHERE id = ? AND is_deleted = 0",
+      sql: "SELECT id, name, employment_status, office_location FROM employees WHERE id = ? AND is_deleted = 0",
       args: [Number(new_employee_id)],
     })
     if (!employee.rows[0]) return NextResponse.json({ detail: "Employee not found" }, { status: 404 })
-    const emp = employee.rows[0] as unknown as { id: number; name: string; employment_status: string }
+    const emp = employee.rows[0] as unknown as { id: number; name: string; employment_status: string; office_location: string | null }
     if (emp.employment_status !== "Active") {
       return NextResponse.json({ detail: "Cannot transfer to inactive employee" }, { status: 400 })
     }
 
-    const asnCount = await db.execute("SELECT COUNT(*) as count FROM asset_assignments")
-    const num = (asnCount.rows[0] as unknown as { count: number }).count
-    const asnId = `ASN-${String(num + 1).padStart(5, "0")}`
+    const { generateDisplayId } = await import("@/lib/id-gen")
+    const asnId = await generateDisplayId("ASN", 5, "asset_assignments", "assignment_id")
 
     await db.execute({
       sql: "UPDATE asset_assignments SET returned_date = datetime('now'), assignment_status = 'Returned' WHERE id = ?",
       args: [Number(id)],
     })
+
+    if (emp.office_location) {
+      await db.execute({
+        sql: "UPDATE assets SET asset_location = ? WHERE id = ?",
+        args: [emp.office_location, asn.asset_id],
+      })
+    }
+
     await db.execute({
       sql: "INSERT INTO asset_assignments (assignment_id, asset_id, employee_id, assigned_date, assignment_status, notes) VALUES (?, ?, ?, ?, 'Assigned', ?)",
       args: [asnId, asn.asset_id, Number(new_employee_id), assigned_date || new Date().toISOString().split("T")[0], notes || null],

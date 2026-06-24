@@ -1,12 +1,12 @@
-let initialized = false
-
 export async function ensureInitialized() {
-  if (initialized) return
-
+  const { db } = await import("./db")
   const { initSchema } = await import("./schema")
   const { seedDefaults } = await import("./seed")
 
   await initSchema()
-  await seedDefaults()
-  initialized = true
+
+  const existing = await db.execute("SELECT COUNT(*) as count FROM users")
+  if ((existing.rows[0] as unknown as { count: number }).count === 0) {
+    await seedDefaults()
+  }
 }

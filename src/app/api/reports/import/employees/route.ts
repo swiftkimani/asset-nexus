@@ -38,20 +38,20 @@ export async function POST(request: Request) {
 
     for (const row of rows) {
       if (!row.name || !row.email) continue
-      const existing = await db.execute({ sql: "SELECT id FROM employees WHERE email = ?", args: [row.email] })
+      const normalizedEmail = row.email.toLowerCase().trim()
+      const existing = await db.execute({ sql: "SELECT id FROM employees WHERE LOWER(email) = ?", args: [normalizedEmail] })
       if (existing.rows.length > 0) {
         await db.execute({
-          sql: `UPDATE employees SET name = ?, phone = ?, designation = ?, department = ?, reporting_person = ?, office_location = ?, joining_date = ?, employment_status = ?, notes = ?, updated_at = datetime('now') WHERE email = ?`,
-          args: [row.name, row.phone || null, row.designation || null, row.department || null, row.reporting || null, row.office || null, row.joining || null, row.status || "Active", row.notes || null, row.email],
+          sql: `UPDATE employees SET name = ?, phone = ?, designation = ?, department = ?, reporting_person = ?, office_location = ?, joining_date = ?, employment_status = ?, notes = ?, updated_at = datetime('now') WHERE LOWER(email) = ?`,
+          args: [row.name, row.phone || null, row.designation || null, row.department || null, row.reporting || null, row.office || null, row.joining || null, row.status || "Active", row.notes || null, normalizedEmail],
         })
         updated++
       } else {
-        const countResult = await db.execute("SELECT COUNT(*) as count FROM employees")
-        const count = (countResult.rows[0] as unknown as { count: number }).count
-        const empId = `EMP-${String(count + 1).padStart(4, "0")}`
+        const { generateDisplayId } = await import("@/lib/id-gen")
+        const empId = await generateDisplayId("EMP", 4, "employees", "employee_id")
         await db.execute({
           sql: "INSERT INTO employees (employee_id, name, email, phone, designation, department, reporting_person, office_location, joining_date, employment_status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          args: [empId, row.name, row.email, row.phone || null, row.designation || null, row.department || null, row.reporting || null, row.office || null, row.joining || null, row.status || "Active", row.notes || null],
+          args: [empId, row.name, normalizedEmail, row.phone || null, row.designation || null, row.department || null, row.reporting || null, row.office || null, row.joining || null, row.status || "Active", row.notes || null],
         })
         created++
       }

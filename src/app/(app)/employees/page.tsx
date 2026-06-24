@@ -130,9 +130,9 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Employees</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-2xl lg:text-3xl font-bold">Employees</h1>
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => window.open("/api/employees/export?fmt=csv")}>
             <Download className="h-4 w-4 mr-2" /> Export
           </Button>
@@ -191,13 +191,14 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 max-w-sm">
-        <Search className="h-4 w-4 text-muted-foreground self-center" />
-        <Input placeholder="Search employees..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input className="pl-9" placeholder="Search employees..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
@@ -238,6 +239,7 @@ export default function EmployeesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 

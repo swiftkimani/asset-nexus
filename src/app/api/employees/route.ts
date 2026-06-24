@@ -23,6 +23,11 @@ export async function GET(request: Request) {
   if (designation) { whereSql += " AND designation LIKE ?"; args.push(`%${designation}%`) }
   if (department) { whereSql += " AND department LIKE ?"; args.push(`%${department}%`) }
 
+  const userRecord = await db.execute({ sql: "SELECT department, role FROM users WHERE email = ?", args: [user!.email] })
+  const userDept = (userRecord.rows[0] as any)?.department
+  const isAdmin = (userRecord.rows[0] as any)?.role === "admin"
+  if (userDept && !isAdmin) { whereSql += " AND department = ?"; args.push(userDept) }
+
   const countResult = await db.execute({
     sql: `SELECT COUNT(*) as count ${baseSql} ${whereSql}`,
     args: [...args],
@@ -49,18 +54,25 @@ export async function POST(request: Request) {
 
     if (!name || !email) return Response.json({ detail: "Name and email required" }, { status: 400 })
 
-    const existing = await db.execute({ sql: "SELECT id FROM employees WHERE email = ?", args: [email] })
+    const { validateEmail, validateBodySize } = await import("@/lib/utils")
+    const sizeErr = validateBodySize(request)
+    if (sizeErr) return Response.json({ detail: sizeErr }, { status: 413 })
+
+    const emailErr = validateEmail(email)
+    if (emailErr) return Response.json({ detail: emailErr }, { status: 400 })
+
+    const normalizedEmail = email.toLowerCase().trim()
+    const existing = await db.execute({ sql: "SELECT id FROM employees WHERE LOWER(email) = ?", args: [normalizedEmail] })
     if (existing.rows.length > 0) return Response.json({ detail: "Employee email already exists" }, { status: 400 })
 
-    const countResult = await db.execute("SELECT COUNT(*) as count FROM employees")
-    const count = (countResult.rows[0] as unknown as { count: number }).count
-    const employeeId = `EMP-${String(count + 1).padStart(4, "0")}`
+    const { generateDisplayId } = await import("@/lib/id-gen")
+    const employeeId = await generateDisplayId("EMP", 4, "employees", "employee_id")
 
     const result = await db.execute({
       sql: `INSERT INTO employees (employee_id, name, email, phone, designation, department, reporting_person, office_location, joining_date, employment_status, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
-        employeeId, body.name, body.email, body.phone || null, body.designation || null,
+        employeeId, body.name, normalizedEmail, body.phone || null, body.designation || null,
         body.department || null, body.reporting_person || null, body.office_location || null,
         body.joining_date || null, body.employment_status || "Active", body.notes || null,
       ],

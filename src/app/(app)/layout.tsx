@@ -4,6 +4,9 @@ import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { NavSidebar } from "@/components/nav-sidebar"
+import { MobileNav } from "@/components/mobile-nav"
+import { CommandPalette } from "@/components/command-palette"
+import { NotificationBell } from "@/components/notification-bell"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -34,10 +37,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex">
+      <CommandPalette />
       <NavSidebar />
-      <main className="flex-1 p-8 overflow-auto">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-14 border-b bg-card flex items-center justify-end px-4 lg:px-8 shrink-0">
+          <NotificationBell />
+        </header>
+        <main className="flex-1 p-4 lg:p-8 overflow-auto pb-20 lg:pb-8">
+          {children}
+        </main>
+      </div>
+      <MobileNav />
     </div>
   )
 }

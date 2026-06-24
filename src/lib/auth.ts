@@ -15,30 +15,39 @@ export async function verifyPassword(plain: string, hashed: string): Promise<boo
   return bcrypt.compare(plain, hashed)
 }
 
-export function createToken(user: Pick<User, "email" | "role" | "name">): string {
+export async function createToken(user: Pick<User, "email" | "role" | "name"> & { org_id?: string | null }): Promise<string> {
+  const { db } = await import("@/lib/db")
+  const result = await db.execute({ sql: "SELECT token_version, org_id FROM users WHERE email = ?", args: [user.email] })
+  const version = (result.rows[0] as any)?.token_version ?? 0
+  const orgId = user.org_id ?? (result.rows[0] as any)?.org_id ?? null
   return jwt.sign(
-    { sub: user.email, role: user.role, name: user.name },
+    { sub: user.email, role: user.role, name: user.name, org_id: orgId, token_version: version },
     SECRET_KEY,
     { algorithm: ALGORITHM, expiresIn: `${ACCESS_TOKEN_EXPIRE_MINUTES}m` },
   )
 }
 
-export function verifyToken(token: string): { sub: string; role: string; name: string } | null {
+export function verifyToken(token: string): { sub: string; role: string; name: string; org_id?: string | null; token_version?: number } | null {
   try {
-    return jwt.verify(token, SECRET_KEY, { algorithms: [ALGORITHM] }) as unknown as { sub: string; role: string; name: string }
+    return jwt.verify(token, SECRET_KEY, { algorithms: [ALGORITHM] }) as unknown as { sub: string; role: string; name: string; org_id?: string | null; token_version?: number }
   } catch {
     return null
   }
 }
 
-export async function getAuthUser(): Promise<{ email: string; role: string; name: string } | null> {
+export async function getAuthUser(): Promise<{ email: string; role: string; name: string; org_id?: string | null } | null> {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get("token")?.value
     if (!token) return null
     const payload = verifyToken(token)
     if (!payload) return null
-    return { email: payload.sub, role: payload.role, name: payload.name }
+
+    const { db } = await import("@/lib/db")
+    const dbResult = await db.execute({ sql: "SELECT token_version FROM users WHERE email = ?", args: [payload.sub] })
+    if (dbResult.rows[0] && (dbResult.rows[0] as any).token_version !== payload.token_version) return null
+
+    return { email: payload.sub, role: payload.role, name: payload.name, org_id: payload.org_id }
   } catch {
     return null
   }

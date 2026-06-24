@@ -30,6 +30,7 @@ export async function POST(request: Request) {
 
     let created = 0
     let updated = 0
+    const { generateDisplayId } = await import("@/lib/id-gen")
 
     for (const row of rows) {
       if (!row.asset_unique_id || !row.asset_name) continue
@@ -55,9 +56,7 @@ export async function POST(request: Request) {
         })
         updated++
       } else {
-        const countResult = await db.execute("SELECT COUNT(*) as count FROM assets")
-        const count = (countResult.rows[0] as unknown as { count: number }).count
-        const assetId = `AST-${String(count + 1).padStart(5, "0")}`
+        const assetId = await generateDisplayId("AST", 5, "assets", "asset_id")
         await db.execute({
           sql: "INSERT INTO assets (asset_id, asset_unique_id, asset_name, category_id, brand, model, serial_number, purchase_date, purchase_cost, vendor, warranty_expiry, asset_location, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           args: [assetId, row.asset_unique_id, row.asset_name, categoryId, row.brand || null, row.model || null, row.serial_number || null, row.purchase_date || null, cost, row.vendor || null, row.warranty_expiry || null, row.asset_location || null, row.status || "Available"],
